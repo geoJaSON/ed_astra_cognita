@@ -1,0 +1,39 @@
+{
+  "_source": "Community-derived exploration value formula (MattG, Frontier forums 'Exploration value formulae', as used by EDDiscovery). Estimates only; verify against in-game sale values.",
+  "planet": {
+    "q": 0.56591828,
+    "defaultK": 300,
+    "defaultTerraformBonus": 93328,
+    "classes": {
+      "Metal rich body": { "k": 21790, "terraformBonus": 65631 },
+      "High metal content body": { "k": 9654, "terraformBonus": 100677 },
+      "Sudarsky class II gas giant": { "k": 9654, "terraformBonus": 0 },
+      "Sudarsky class I gas giant": { "k": 1656, "terraformBonus": 0 },
+      "Ammonia world": { "k": 96932, "terraformBonus": 0 },
+      "Water world": { "k": 64831, "terraformBonus": 116295 },
+      "Earthlike body": { "k": 64831, "terraformBonus": 116295, "alwaysTerraformable": true }
+    }
+  },
+  "star": {
+    "defaultK": 1200,
+    "massDivisor": 66.25,
+    "classes": {
+      "N": 22628,
+      "H": 22628,
+      "SupermassiveBlackHole": 33.5678,
+      "D": 14057, "DA": 14057, "DAB": 14057, "DAO": 14057, "DAZ": 14057, "DAV": 14057,
+      "DB": 14057, "DBZ": 14057, "DBV": 14057, "DO": 14057, "DOV": 14057, "DQ": 14057,
+      "DC": 14057, "DCV": 14057, "DX": 14057
+    }
+  },
+  "multipliers": {
+    "firstDiscovery": 2.6,
+    "mapped": 3.3333333333,
+    "mappedFirstMapped": 8.0956,
+    "mappedFirstDiscoveredAndMapped": 3.699622554,
+    "efficiency": 1.25,
+    "odysseyMappedBonusFraction": 0.3,
+    "odysseyMappedBonusMin": 555,
+    "minimumValue": 500
+  }
+}

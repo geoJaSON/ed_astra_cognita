@@ -1,0 +1,413 @@
+/* Bookmarks tab, editor dialog, Current System banner and map markers. */
+
+.bookmarks {
+  max-width: 1000px;
+}
+
+.bm-star {
+  color: #ffc940;
+}
+.bm-star--after {
+  margin-left: 6px;
+}
+
+/* ---- Shared controls ---- */
+
+.bm-editor input,
+.bm-editor textarea,
+.bm-search,
+.bm-sort select {
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.bm-editor input:focus,
+.bm-editor textarea:focus,
+.bm-search:focus,
+.bm-sort select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.bm-primary,
+.bm-copy {
+  border-color: rgba(255, 140, 26, 0.55);
+  background: rgba(255, 140, 26, 0.14);
+  color: var(--accent);
+  font-weight: 600;
+}
+.bm-primary:hover,
+.bm-copy:hover {
+  background: rgba(255, 140, 26, 0.24);
+}
+
+.bookmarks button:disabled,
+.bm-editor button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.bookmarks button:disabled:hover,
+.bm-editor button:disabled:hover {
+  border-color: var(--line);
+}
+
+.bm-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+}
+.bm-link:hover {
+  text-decoration: underline;
+}
+
+.bm-chip {
+  margin: 0;
+}
+
+.bm-alert,
+.bm-status {
+  margin: 10px 0;
+  padding: 6px 10px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.bm-alert {
+  border-color: rgba(255, 107, 107, 0.4);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ff6b6b;
+}
+.bm-status {
+  border-color: rgba(95, 211, 141, 0.35);
+  background: rgba(95, 211, 141, 0.08);
+  color: var(--good);
+}
+
+/* ---- Tab ---- */
+
+.bm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.bm-search {
+  width: 320px;
+  max-width: 100%;
+}
+.bm-sort {
+  color: var(--muted);
+  font-size: 13px;
+}
+.bm-toolbar__spacer {
+  flex: 1;
+}
+
+.bm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+.bm-filter {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.bm-filter--on {
+  border-color: var(--accent);
+  background: rgba(255, 140, 26, 0.14);
+  color: var(--text);
+}
+.bm-filter__count {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.bm-filters .bm-link {
+  margin-left: 6px;
+}
+
+.bm-count {
+  margin: 12px 0 2px;
+  font-size: 12px;
+}
+.bm-count__note {
+  opacity: 0.75;
+}
+
+.bm-empty {
+  max-width: 560px;
+  padding: 24px 0;
+}
+.bm-empty p {
+  margin: 0 0 8px;
+}
+
+.bm-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bm-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 130px auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bm-copy {
+  width: 100%;
+}
+.bm-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+.bm-row__system {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.bm-row__body {
+  color: #c9cdd2;
+}
+.bm-row__body::before {
+  content: "· ";
+  color: var(--muted);
+}
+.bm-row__dist {
+  padding-top: 2px;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.bm-row__jumps {
+  display: block;
+  font-size: 12px;
+}
+.bm-row__edit {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.bm-here {
+  color: var(--good);
+}
+
+.bm-notes {
+  margin-top: 4px;
+}
+.bm-notes__text {
+  margin: 0;
+  color: #c9cdd2;
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bm-notes__text--clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ---- Current System banner ---- */
+
+.bm-banner {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 201, 64, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 201, 64, 0.05);
+}
+.bm-banner__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffc940;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* One grid for all items so the columns line up. */
+.bm-banner__list {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.bm-banner__item {
+  display: contents;
+}
+.bm-banner__notes {
+  overflow: hidden;
+  color: #c9cdd2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-banner__item button {
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+/* ---- Editor dialog ---- */
+
+.bm-editor {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.bm-editor::backdrop {
+  background: rgba(5, 7, 10, 0.6);
+}
+.bm-editor__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+}
+.bm-editor__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.bm-editor__row {
+  display: flex;
+  gap: 10px;
+}
+.bm-editor__row .bm-field:not(.bm-field--grow) {
+  width: 170px;
+}
+.bm-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  cursor: default;
+}
+.bm-field > span:first-child {
+  color: var(--muted);
+  font-size: 12px;
+}
+.bm-field--grow {
+  flex: 1;
+}
+.bm-editor textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.45;
+}
+.bm-editor__note {
+  margin-top: -6px;
+  font-size: 12px;
+}
+
+.bm-cats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.bm-cat {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.bm-cat--on {
+  border-color: var(--accent);
+  background: rgba(255, 140, 26, 0.14);
+  color: var(--text);
+}
+.bm-cats__add {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+}
+.bm-editor .bm-cats__add input {
+  width: 130px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.bm-cats__add button {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.bm-editor__error {
+  color: #ff6b6b;
+  font-size: 13px;
+}
+.bm-editor__buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.bm-editor__spacer {
+  flex: 1;
+}
+.bm-editor__confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ff6b6b;
+  font-size: 13px;
+}
+.bm-danger {
+  border-color: rgba(255, 107, 107, 0.6);
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+}
+.bm-danger:hover {
+  border-color: #ff6b6b;
+}
+.bm-danger-quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+.bm-danger-quiet:hover {
+  border-color: rgba(255, 107, 107, 0.5);
+  color: #ff6b6b;
+}
+
+/* ---- Galaxy map ---- */
+
+.bm-map-icon {
+  color: #ffc940;
+  font-size: 16px;
+  line-height: 16px;
+  text-align: center;
+  text-shadow: 0 0 2px #000, 0 0 3px #000;
+}
+.bm-map-tip strong {
+  display: block;
+}
+.bm-map-tip div {
+  color: var(--muted);
+}
+/* Stars not on a POI have nothing to select. */
+.bm-map-icon--static.leaflet-interactive {
+  cursor: grab;
+}
