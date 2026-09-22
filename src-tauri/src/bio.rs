@@ -583,6 +583,11 @@ pub(crate) fn species_value(species_id: &str) -> Option<u64> {
     data().genera.iter().flat_map(|g| &g.species).find(|s| s.id == species_id).map(|s| s.value)
 }
 
+/// Minimum spacing between samples of one colony, by genus codex id.
+pub(crate) fn colony_distance_m(genus_id: &str) -> Option<u32> {
+    data().genera.iter().find(|g| g.id == genus_id).map(|g| g.colony_distance_m)
+}
+
 fn value_range(candidates: &[Candidate]) -> Option<(u64, u64)> {
     Some((candidates.first()?.value, candidates.last()?.value))
 }

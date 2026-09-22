@@ -65,19 +65,25 @@ export function highlights(system: SystemView, min: WorthThresholds): Highlight[
       });
     }
     if (b.bio && hasFirstBio(b) && b.bio.valueMax >= min.bio) {
-      const done = speciesDone(b);
-      out.push({
-        key: `bio-${b.id}`,
-        kind: "bio",
-        body: b,
-        value: b.bio.valueMax,
-        valueMin: b.bio.valueMin,
-        done: done >= b.bio.signals,
-        progress: `${done}/${b.bio.signals}`,
-      });
+      out.push(bioHighlight(b)!);
     }
   }
   return out.sort((a, b) => Number(a.done) - Number(b.done) || b.value - a.value);
+}
+
+/** The exobiology row for a body, whatever it's worth; null without bio. */
+export function bioHighlight(b: Body): Highlight | null {
+  if (!b.bio) return null;
+  const done = speciesDone(b);
+  return {
+    key: `bio-${b.id}`,
+    kind: "bio",
+    body: b,
+    value: b.bio.valueMax,
+    valueMin: b.bio.valueMin,
+    done: done >= b.bio.signals,
+    progress: `${done}/${b.bio.signals}`,
+  };
 }
 
 export type VerdictTone = "good" | "mixed" | "bad" | "pending";
@@ -109,6 +115,7 @@ export function formatRange(min: number, max: number): string {
 }
 
 export function formatCredits(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
   if (v >= 1e7) return `${(v / 1e6).toFixed(1)}M`;
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (v >= 1e3) return `${Math.round(v / 1e3)}k`;

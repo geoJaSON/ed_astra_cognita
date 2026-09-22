@@ -35,7 +35,16 @@ pnpm tauri build    # installer in src-tauri/target/release/bundle
 - Species are predicted from each planet's scan (atmosphere, gravity, temperature, pressure, volcanism, materials), its stars, and the galactic region, using rules ported from [EDMC-BioScan](https://github.com/Silarn/EDMC-BioScan).
 - Predictions narrow as you play: before the DSS every genus the rules allow is shown (`?`); after the DSS only the genera found (`●`); while sampling, the species itself and the colony spacing.
 - **First-logged bonus** (5x payout): assumed when nobody has set foot on the planet and the system is unpopulated, as BioScan does. Every sale in these journals so far paid exactly 4x extra on such planets.
+- **In the overlay:** near a bio planet (the body `Status.json` says you're at), its genera are listed under it with the likeliest species, their colours and values, and the colony spacing. Once you're landed, in the SRV or on foot there, the overlay shows only that planet, whatever it's worth.
+- **Sampling helper:** while a species is part-sampled, the overlay shows the distance and direction (relative to where you're facing) to each earlier sample, and whether you're past the colony spacing. `ScanOrganic` has no coordinates, so each sample is pinned to your `Status.json` position when it's logged; samples taken while the app was closed have no position. The trail is saved to `sampling.json` in the app data folder.
 - Checked against these journals: every species analysed on a planet the app had scan data for was among its predictions (`cargo test backtest_bio_predictions -- --ignored --nocapture`).
+
+### Unsold data
+
+The overlay footer and Current System show what you're carrying unsold, which dying would lose. At startup the journals are read back to your last `Died`.
+
+- **Bio:** each analysed species at its predicted payout (with the first-logged bonus under the same rule as above), removed species by species by `SellOrganicData`. Matched the two Vista Genomics sales in these journals to within 3%.
+- **Cartographic:** every scanned body, plus DSS mapping, kept per system because Universal Cartographics buys a system at a time; `SellExplorationData`/`MultiSellExplorationData` clear the systems sold, and those bodies earn nothing if rescanned. Values come from the mapping formula above, so it's shown as `≈`: on the two sales here where every system was scanned in these journals it ran 23% and 64% high. `cargo test backtest_unsold -- --ignored --nocapture` compares each sale.
 
 ### Updating the species data
 

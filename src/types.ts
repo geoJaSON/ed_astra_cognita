@@ -124,6 +124,46 @@ export interface Snapshot {
   bookmarksLookupError: string | null;
   /** Full name of the body the game reports you're near, if any. */
   currentBody: string | null;
+  /** Where you are on or over a planet. Also pushed alone as a `position` event while you move. */
+  position: Surface | null;
+  /** The species you're part way through sampling. */
+  sampling: SamplingTrail | null;
+  unsold: Unsold;
+}
+
+/** Mirrors journal::Surface, from Status.json. */
+export interface Surface {
+  /** Full body name. */
+  body: string;
+  lat: number;
+  lon: number;
+  /** Degrees clockwise from north. */
+  heading: number | null;
+  altitude: number | null;
+  planetRadiusM: number | null;
+  /** Landed, in the SRV or on foot, as opposed to flying over the planet. */
+  onSurface: boolean;
+}
+
+/** Mirrors sampling::Trail. */
+export interface SamplingTrail {
+  systemAddress: number;
+  bodyId: number;
+  speciesId: string;
+  species: string;
+  colonyDistanceM: number | null;
+  /** [latitude, longitude] of each sample so far, oldest first; null where the app didn't see where it was taken. */
+  samples: ([number, number] | null)[];
+  updated: string;
+}
+
+/** Mirrors unsold::UnsoldView: carried data that dying would lose. Estimates. */
+export interface Unsold {
+  cartoValue: number;
+  cartoSystems: number;
+  cartoBodies: number;
+  bioValue: number;
+  bioSpecies: number;
 }
 
 // ---- Nearby ----

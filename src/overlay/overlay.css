@@ -11,7 +11,7 @@
   display: inline-block;
   box-sizing: border-box;
   min-width: 300px;
-  max-width: 452px;
+  max-width: 480px;
   margin: 4px;
   padding: 4px 10px;
   border-left: 3px solid var(--accent);
@@ -50,12 +50,15 @@
 }
 
 .hl {
+  padding: 3px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.hl__row {
   display: grid;
   grid-template-columns: 34px 44px 1fr auto auto;
   align-items: baseline;
   gap: 6px;
-  padding: 3px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .hl:first-child {
@@ -101,5 +104,148 @@
 .hl__value {
   min-width: 48px;
   text-align: right;
+  font-weight: 600;
+}
+
+/* ---- genera under the body you're at ---- */
+
+.gl-list {
+  margin: 2px 0 1px;
+  padding: 0;
+  list-style: none;
+}
+
+.gl {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 12px;
+}
+
+.gl--predicted {
+  color: #b8bcc2;
+}
+
+.gl--done {
+  opacity: 0.45;
+}
+
+.gl__mark {
+  color: var(--good);
+  font-size: 11px;
+  text-align: center;
+}
+.gl--predicted .gl__mark {
+  color: #9aa0a6;
+}
+
+.gl__main {
+  min-width: 0;
+}
+
+.gl__name {
+  display: block;
+  font-weight: 600;
+}
+
+.gl__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  font-size: 11px;
+}
+
+.gl__muted,
+.gl-more {
+  color: #9aa0a6;
+  font-weight: 400;
+}
+
+.gl-more {
+  padding-left: 40px;
+  font-size: 11px;
+}
+
+.gl__value {
+  font-weight: 600;
+}
+
+.colors {
+  margin-left: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #c8ccd0;
+}
+
+.colors__one + .colors__one {
+  margin-left: 5px;
+}
+
+.colors__one i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 3px;
+  border-radius: 50%;
+  vertical-align: 1px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- sampling helper ---- */
+
+.sp {
+  margin: 3px 0 2px;
+  padding: 4px 0 2px;
+  border-top: 1px solid rgba(95, 211, 141, 0.35);
+}
+
+.sp__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sp__samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin-top: 2px;
+  padding-left: 42px;
+}
+
+.sp__sample--clear {
+  color: var(--good);
+}
+
+.sp__arrow {
+  display: inline-block;
+  font-weight: 700;
+}
+
+.sp__status {
+  margin-top: 2px;
+  padding-left: 42px;
+  font-weight: 600;
+}
+.sp__status--good { color: var(--good); }
+.sp__status--bad { color: #ff6b5f; }
+.sp__status--mixed { color: #f2c94c; }
+
+/* ---- unsold tally ---- */
+
+.ov__unsold {
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.ov__unsold b {
+  color: #e8e6e3;
   font-weight: 600;
 }

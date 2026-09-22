@@ -3,9 +3,11 @@ mod bookmarks;
 mod journal;
 mod overlay;
 mod pois;
+mod sampling;
 mod settings;
 mod system;
 mod travel;
+mod unsold;
 mod values;
 
 use serde::{Deserialize, Serialize};
@@ -83,6 +85,11 @@ struct Snapshot {
     bookmarks_lookup_error: Option<String>,
     /// The body you're near or on, from Status.json.
     current_body: Option<String>,
+    /// Where you are on or over a planet. Also pushed alone as a `position` event while it's the only change.
+    position: Option<journal::Surface>,
+    /// The species you're part way through sampling, and where each sample was taken.
+    sampling: Option<sampling::Trail>,
+    unsold: unsold::UnsoldView,
 }
 
 struct Core {
@@ -102,6 +109,9 @@ struct Core {
     pois: Option<pois::PoiSet>,
     pois_loading: bool,
     current_body: Option<String>,
+    position: Option<journal::Surface>,
+    sampling: sampling::Sampling,
+    unsold: unsold::Unsold,
     bookmarks: bookmarks::Store,
     /// EDSM lookups wait until the travel history has loaded, so systems you've visited never need one.
     lookups_ready: bool,
@@ -189,6 +199,9 @@ impl Core {
             bookmarks_error: self.bookmarks.error(),
             bookmarks_lookup_error: self.bookmarks.lookup_error(),
             current_body: self.current_body.clone(),
+            position: self.position.clone(),
+            sampling: self.sampling.trail().cloned(),
+            unsold: self.unsold.view(),
         }
     }
 
@@ -409,10 +422,16 @@ fn watch(app: AppHandle, overlay_hwnd: Option<usize>) {
     let mut last_raise = Instant::now() - TOPMOST_REFRESH;
 
     if let Some(t) = tailer.as_mut() {
-        let events = t.backfill_current_system();
+        let (older, events) = t.backfill_with_history(unsold::wants);
         let mut core = core(&app);
+        for ev in &older {
+            core.unsold.apply(ev);
+        }
         for ev in &events {
             core.tracker.apply(ev);
+            core.unsold.apply(ev);
+            // Positions of past samples aren't known; the saved trail has any that were seen live.
+            core.sampling.apply(ev, None);
         }
     }
     if let Some(r) = route.as_mut().and_then(|r| r.poll()) {
@@ -433,11 +452,32 @@ fn watch(app: AppHandle, overlay_hwnd: Option<usize>) {
         let new_route = route.as_mut().and_then(|r| r.poll());
         let focused = foreground.game_is_foreground();
 
-        let (changed, visible) = {
+        let (changed, moved, visible) = {
             let mut core = core(&app);
             let mut changed = false;
+            let mut moved = false;
+            // Status first, so a sample is pinned to where you are when its journal line arrives.
+            if let Some(s) = new_status {
+                if s.gui_focus != core.gui_focus {
+                    core.gui_focus = s.gui_focus;
+                    changed = true;
+                }
+                let body = s.body_name.as_deref().map(str::trim).filter(|b| !b.is_empty()).map(str::to_string);
+                if body != core.current_body {
+                    core.current_body = body;
+                    changed = true;
+                }
+                let position = s.surface();
+                if position != core.position {
+                    core.position = position;
+                    moved = true;
+                }
+            }
             for ev in &events {
                 changed |= core.tracker.apply(ev);
+                changed |= core.unsold.apply(ev);
+                let pos = core.position.as_ref().map(|p| [p.lat, p.lon]);
+                changed |= core.sampling.apply(ev, pos);
                 if matches!(ev["event"].as_str(), Some("FSDJump" | "CarrierJump")) {
                     if let Ok(stop) = travel::Stop::deserialize(ev) {
                         changed |= core
@@ -455,25 +495,18 @@ fn watch(app: AppHandle, overlay_hwnd: Option<usize>) {
                 core.with_bookmarks(|store, known| store.fill_positions(known));
                 changed = true;
             }
-            if let Some(s) = new_status {
-                if s.gui_focus != core.gui_focus {
-                    core.gui_focus = s.gui_focus;
-                    changed = true;
-                }
-                let body = s.body_name.map(|b| b.trim().to_string()).filter(|b| !b.is_empty());
-                if body != core.current_body {
-                    core.current_body = body;
-                    changed = true;
-                }
-            }
             if focused != core.game_focused {
                 core.game_focused = focused;
                 changed = true;
             }
-            (changed, core.overlay_visible())
+            (changed, moved, core.overlay_visible())
         };
         if changed {
             emit_snapshot(&app);
+        } else if moved {
+            // Walking rewrites Status.json constantly; only the overlay needs it, so skip rebuilding the snapshot.
+            let position = core(&app).position.clone();
+            let _ = app.emit("position", position);
         }
 
         #[cfg(windows)]
@@ -522,6 +555,11 @@ pub fn run() {
                 pois: None,
                 pois_loading: false,
                 current_body: None,
+                position: None,
+                sampling: sampling::Sampling::open(
+                    app.path().app_data_dir().ok().map(|d| d.join(sampling::FILE_NAME)),
+                ),
+                unsold: unsold::Unsold::default(),
                 bookmarks: bookmarks::Store::open(app.path().app_data_dir().ok().map(|d| d.join(bookmarks::FILE_NAME))),
                 lookups_ready: false,
                 lookups_running: false,
@@ -590,6 +628,58 @@ mod tests {
             tracker.apply(&ev);
         }
         println!("{}", serde_json::to_string_pretty(&tracker.view()).unwrap());
+    }
+
+    /// Replays every journal and compares the unsold estimate with what each sale paid. Run with
+    /// `cargo test backtest_unsold -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn backtest_unsold() {
+        let dir = journal::journal_dir().expect("journal folder not found");
+        let mut ledger = unsold::Unsold::default();
+        for ev in journal::JournalTailer::new(dir).backfill(usize::MAX) {
+            match ev["event"].as_str() {
+                Some("MultiSellExplorationData" | "SellExplorationData") => {
+                    let names: Vec<&str> = ev["Discovered"]
+                        .as_array()
+                        .or(ev["Systems"].as_array())
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|d| d["SystemName"].as_str().or(d.as_str()))
+                        .collect();
+                    // TotalEarnings can be net of deductions; BaseValue + Bonus is what the data was worth.
+                    let paid = ev["BaseValue"].as_u64().unwrap_or(0) + ev["Bonus"].as_u64().unwrap_or(0);
+                    let estimate = ledger.estimate_sale(&names);
+                    println!(
+                        "{} carto {} systems: paid {paid}, estimated {estimate} ({:+.1}%)",
+                        ev["timestamp"].as_str().unwrap_or_default(),
+                        names.len(),
+                        (estimate as f64 / paid as f64 - 1.0) * 100.0
+                    );
+                    for name in &names {
+                        println!("    {name}: {}", ledger.estimate_sale(&[name]));
+                    }
+                }
+                Some("SellOrganicData") => {
+                    let paid: u64 = ev["BioData"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|b| b["Value"].as_u64().unwrap_or(0) + b["Bonus"].as_u64().unwrap_or(0))
+                        .sum();
+                    let before = ledger.view();
+                    println!(
+                        "{} bio: paid {paid}, carrying {} species estimated {}",
+                        ev["timestamp"].as_str().unwrap_or_default(),
+                        before.bio_species,
+                        before.bio_value
+                    );
+                }
+                _ => {}
+            }
+            ledger.apply(&ev);
+        }
+        println!("unsold now: {:?}", ledger.view());
     }
 
     /// Replays every journal and checks each species you finished analysing was among the predictions for that

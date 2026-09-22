@@ -1,6 +1,6 @@
 //! Locating and tailing the game's journal files and `Status.json`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
@@ -67,14 +67,37 @@ impl JournalTailer {
 
     /// Reads journals from the one containing your most recent jump onward, so everything scanned in the current
     /// system survives any number of relogs, then leaves the tailer at the end of the newest journal.
+    #[cfg(test)]
     pub fn backfill_current_system(&mut self) -> Vec<Value> {
+        let from_end = self.current_system_files();
+        self.backfill(from_end)
+    }
+
+    /// Like `backfill_current_system`, but also returns the lines of older journals that pass `keep`, reading back
+    /// only as far as your most recent death (everything unsold before it was lost). The older events come first.
+    pub fn backfill_with_history(&mut self, keep: impl Fn(&str) -> bool) -> (Vec<Value>, Vec<Value>) {
+        let all = journal_files(&self.dir);
+        let from_end = self.current_system_files();
+        let mut older: Vec<Vec<Value>> = Vec::new();
+        for path in all[..all.len().saturating_sub(from_end)].iter().rev() {
+            let Ok(text) = fs::read_to_string(path) else { continue };
+            older.push(text.lines().filter(|l| keep(l)).filter_map(|l| serde_json::from_str(l).ok()).collect());
+            if text.contains(r#""event":"Died""#) {
+                break;
+            }
+        }
+        let older = older.into_iter().rev().flatten().collect();
+        (older, self.backfill(from_end))
+    }
+
+    /// How many of the newest journals to read to cover everything since your most recent jump.
+    fn current_system_files(&self) -> usize {
         let all = journal_files(&self.dir);
         let has_jump = |path: &PathBuf| {
             fs::read_to_string(path)
                 .is_ok_and(|text| text.contains(r#""event":"FSDJump""#) || text.contains(r#""event":"CarrierJump""#))
         };
-        let from_end = all.iter().rev().position(has_jump).map_or(all.len(), |i| i + 1);
-        self.backfill(from_end)
+        all.iter().rev().position(has_jump).map_or(all.len(), |i| i + 1)
     }
 
     /// Reads the last `files` journals in full, then leaves the tailer at the end of the newest one.
@@ -146,10 +169,51 @@ pub struct Status {
     #[serde(default)]
     pub flags: u64,
     #[serde(default)]
+    pub flags2: u64,
+    #[serde(default)]
     pub gui_focus: u32,
     pub body_name: Option<String>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
+    pub heading: Option<f64>,
+    pub altitude: Option<f64>,
+    pub planet_radius: Option<f64>,
+}
+
+const FLAG_LANDED: u64 = 1 << 1;
+const FLAG_IN_SRV: u64 = 1 << 26;
+const FLAG2_ON_FOOT_ON_PLANET: u64 = 1 << 4;
+
+/// Where you are on (or above) a planet, from `Status.json`.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Surface {
+    /// Full body name.
+    pub body: String,
+    pub lat: f64,
+    pub lon: f64,
+    /// Degrees clockwise from north.
+    pub heading: Option<f64>,
+    /// Metres; above the surface when landed or on foot, above the planet's centre-ish otherwise.
+    pub altitude: Option<f64>,
+    pub planet_radius_m: Option<f64>,
+    /// Landed, in the SRV or on foot, as opposed to flying over it.
+    pub on_surface: bool,
+}
+
+impl Status {
+    pub fn surface(&self) -> Option<Surface> {
+        let body = self.body_name.as_deref().map(str::trim).filter(|b| !b.is_empty())?;
+        Some(Surface {
+            body: body.to_string(),
+            lat: self.latitude?,
+            lon: self.longitude?,
+            heading: self.heading,
+            altitude: self.altitude,
+            planet_radius_m: self.planet_radius,
+            on_surface: self.flags & (FLAG_LANDED | FLAG_IN_SRV) != 0 || self.flags2 & FLAG2_ON_FOOT_ON_PLANET != 0,
+        })
+    }
 }
 
 /// Re-reads `Status.json` whenever the game rewrites it.

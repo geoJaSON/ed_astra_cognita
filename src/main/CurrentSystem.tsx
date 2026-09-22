@@ -12,7 +12,7 @@ import {
   speciesDone,
   verdict,
 } from "../highlights";
-import type { Body, Bookmark, Snapshot } from "../types";
+import type { Body, Bookmark, Snapshot, Unsold } from "../types";
 import BookmarkBanner from "./bookmarks/BookmarkBanner";
 import { bookmarksFor, shortBodyName, type OpenEditor } from "./bookmarks/useBookmarks";
 import CopyButton from "./CopyButton";
@@ -56,6 +56,7 @@ export default function CurrentSystem({ snapshot, bookmarks, openEditor }: Props
             </button>
           </h1>
           <div className="muted">{bodiesSummary(system)}</div>
+          <UnsoldSummary unsold={snapshot.unsold} />
         </div>
         <span className={`verdict verdict--${v.tone}`}>{v.label}</span>
       </section>
@@ -180,5 +181,23 @@ function BodyRow({ body: b }: { body: Body }) {
         </tr>
       ))}
     </>
+  );
+}
+
+/** Carried data that dying would lose. */
+function UnsoldSummary({ unsold: u }: { unsold: Unsold }) {
+  if (u.bioValue === 0 && u.cartoValue === 0) return null;
+  const parts: string[] = [];
+  if (u.bioValue > 0) parts.push(`bio ${formatCredits(u.bioValue)} (${u.bioSpecies} species)`);
+  if (u.cartoValue > 0) {
+    parts.push(`cartographic ≈${formatCredits(u.cartoValue)} (${u.cartoSystems} systems, ${u.cartoBodies} bodies)`);
+  }
+  return (
+    <div
+      className="muted"
+      title="Estimated from the journals since your last death; cartographic values are rough and have run 20-60% high"
+    >
+      Unsold: {parts.join(" · ")}
+    </div>
   );
 }
