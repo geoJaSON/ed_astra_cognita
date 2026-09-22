@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSnapshot } from "../useSnapshot";
@@ -38,10 +38,53 @@ function usePosition(snapshot: Snapshot | null): Surface | null {
 const sameName = (a: string | null | undefined, b: string | null | undefined) =>
   a != null && b != null && a.toLowerCase() === b.toLowerCase();
 
+/** Remember the last system actually shown, including across menu/focus changes. */
+function useEntrance(visible: boolean, systemKey: string) {
+  const frame = useRef<HTMLDivElement>(null);
+  const lastShownSystem = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    // StrictMode may run this effect twice on the same element.
+    if (!visible || !frame.current || frame.current.dataset.enter) return;
+    frame.current.dataset.enter = lastShownSystem.current === systemKey ? "return" : "power";
+    lastShownSystem.current = systemKey;
+  }, [visible, systemKey]);
+  return frame;
+}
+
+/** Celebrate a live state change once; already-complete rows stay quiet on mount. */
+function useStateFlash<T extends HTMLElement>(active: boolean, dimAfter = false) {
+  const element = useRef<T>(null);
+  const wasActive = useRef(active);
+  useLayoutEffect(() => {
+    const changed = active && !wasActive.current;
+    wasActive.current = active;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!changed || !element.current || reducedMotion.matches) return;
+    const animation = element.current.animate(
+      [
+        { opacity: 1, boxShadow: "inset 0 0 0 1px rgba(95, 211, 141, 0.5), inset 0 0 22px rgba(95, 211, 141, 0.15)" },
+        { opacity: 1, offset: 0.3, boxShadow: "inset 0 0 0 1px rgba(95, 211, 141, 0.25), inset 0 0 16px rgba(95, 211, 141, 0.08)" },
+        { opacity: dimAfter ? 0.52 : 1, boxShadow: "inset 0 0 0 1px transparent, inset 0 0 0 transparent" },
+      ],
+      { duration: 900, easing: "ease-out" },
+    );
+    const cancel = () => animation.cancel();
+    reducedMotion.addEventListener("change", cancel);
+    return () => {
+      animation.cancel();
+      reducedMotion.removeEventListener("change", cancel);
+    };
+  }, [active, dimAfter]);
+  return element;
+}
+
 export default function Overlay() {
   const snapshot = useSnapshot();
   const position = usePosition(snapshot);
-  if (!snapshot?.overlay.visible) return null;
+  return snapshot ? <OverlayView snapshot={snapshot} position={position} /> : null;
+}
+
+function OverlayView({ snapshot, position }: { snapshot: Snapshot; position: Surface | null }) {
   const { system, overlay } = snapshot;
 
   const here = system?.bodies.find((b) => sameName(b.name, snapshot.currentBody));
@@ -57,11 +100,17 @@ export default function Overlay() {
       ? sameName(position.body, here.name)
       : false;
 
+  const visible = overlay.visible && (items.length > 0 || overlay.unlocked);
+  const systemKey = system ? `${system.address}:${system.name}` : "no-system";
+  const frame = useEntrance(visible, systemKey);
+
   // Nothing worth doing: stay out of the way, unless it's being moved and needs something to grab.
-  if (items.length === 0 && !overlay.unlocked) return null;
+  if (!visible) return null;
 
   return (
     <div
+      key={systemKey}
+      ref={frame}
       className={overlay.unlocked ? "ov ov--unlocked" : "ov"}
       onMouseDown={overlay.unlocked ? () => getCurrentWindow().startDragging() : undefined}
     >
@@ -71,36 +120,39 @@ export default function Overlay() {
       ) : (
         <ul className="ov__list">
           {items.slice(0, MAX_ROWS).map((i) => (
-            <HighlightRow key={i.key} item={i} expanded={i.kind === "bio" && i.body.id === here?.id} />
+            <HighlightRow key={i.key} item={i} current={i.body.id === here?.id} />
           ))}
         </ul>
       )}
       {items.length > MAX_ROWS && <div className="ov__more">+{items.length - MAX_ROWS} more</div>}
-      {sampling && <SamplingPanel trail={trail!} position={position!} />}
+      {sampling && <SamplingPanel key={`${trail!.bodyId}:${trail!.speciesId}`} trail={trail!} position={position!} />}
       {elsewhere > 0 && <div className="ov__more">{elsewhere} more in this system</div>}
       <UnsoldLine unsold={snapshot.unsold} />
     </div>
   );
 }
 
-function HighlightRow({ item, expanded }: { item: Highlight; expanded: boolean }) {
+function HighlightRow({ item, current }: { item: Highlight; current: boolean }) {
   const { body, kind, done } = item;
+  const expanded = kind === "bio" && current;
+  const row = useStateFlash<HTMLLIElement>(done, true);
   const detail = kind === "map" || expanded ? bodyLabel(body) : bioDetail(body);
   const firstTag = kind === "bio" ? (hasFirstBio(body) ? "1st logged" : "") : body.wasDiscovered ? "1st map" : "1st disc + map";
+  const cls = ["hl", `hl--${kind}`, done && "hl--done", current && "hl--current"].filter(Boolean).join(" ");
 
   return (
-    <li className={done ? "hl hl--done" : "hl"}>
+    <li ref={row} className={cls} aria-current={current ? "location" : undefined}>
       <div className="hl__row">
         <span className={`hl__tag hl__tag--${kind}`}>{kind === "map" ? "MAP" : "BIO"}</span>
-        <span className="hl__body">{body.shortName}</span>
-        <span className="hl__detail">
+        <span className="hl__body" title={body.name}>{body.shortName}</span>
+        <span className="hl__detail" title={[detail, firstTag].filter(Boolean).join(" · ")}>
           {detail}
           {firstTag && <span className="hl__first">{firstTag}</span>}
         </span>
         <span className="hl__status">{done ? "✓" : item.progress}</span>
         <span className="hl__value">{formatRange(item.valueMin, item.value)}</span>
       </div>
-      {expanded && body.bio && <GeneraList bio={body.bio} />}
+      {expanded && body.bio && <GeneraList bio={body.bio} bodyDone={done} />}
     </li>
   );
 }
@@ -116,22 +168,23 @@ function generaToShow(bio: BioView): { shown: BioGenus[]; more: number } {
   };
 }
 
-function GeneraList({ bio }: { bio: BioView }) {
+function GeneraList({ bio, bodyDone }: { bio: BioView; bodyDone: boolean }) {
   const { shown, more } = generaToShow(bio);
   return (
     <ul className="gl-list">
       {shown.map((g) => (
-        <GenusLine key={g.name} genus={g} />
+        <GenusLine key={g.name} genus={g} bodyDone={bodyDone} />
       ))}
       {more > 0 && <li className="gl-more">+{more} more possible · map with the DSS to narrow down</li>}
     </ul>
   );
 }
 
-function GenusLine({ genus: g }: { genus: BioGenus }) {
+function GenusLine({ genus: g, bodyDone }: { genus: BioGenus; bodyDone: boolean }) {
   const samples = g.sampled?.samples ?? 0;
   const analysed = samples >= 3;
-  const mark = analysed ? "✓" : samples > 0 ? `${samples}/3` : g.confirmed ? "●" : "?";
+  const row = useStateFlash<HTMLLIElement>(analysed && !bodyDone, true);
+  const mark = g.confirmed ? "●" : "?";
   const sampled = g.sampled ? g.candidates.find((c) => c.name === g.sampled!.species) : undefined;
   const single = !g.sampled && g.candidates.length === 1 ? g.candidates[0] : undefined;
   // Most valuable first: that's the one worth looking for.
@@ -140,8 +193,8 @@ function GenusLine({ genus: g }: { genus: BioGenus }) {
   const cls = ["gl", analysed && "gl--done", !g.confirmed && "gl--predicted"].filter(Boolean).join(" ");
 
   return (
-    <li className={cls}>
-      <span className="gl__mark">{mark}</span>
+    <li ref={row} className={cls}>
+      <span className="gl__mark">{g.sampled ? <SampleProgress samples={samples} /> : mark}</span>
       <span className="gl__main">
         <span className="gl__name">
           {genusLabel(g)}
@@ -182,6 +235,17 @@ function Colors({ colors }: { colors: string[] }) {
   );
 }
 
+function SampleProgress({ samples }: { samples: number }) {
+  const label = `${samples} of 3 samples collected`;
+  return (
+    <span className="sample-progress" role="img" aria-label={label} title={label}>
+      {[1, 2, 3].map((step) => (
+        <span key={step} className={step <= samples ? "sample-progress__step is-filled" : "sample-progress__step"} aria-hidden="true" />
+      ))}
+    </span>
+  );
+}
+
 function SamplingPanel({ trail, position }: { trail: SamplingTrail; position: Surface }) {
   const need = trail.colonyDistanceM;
   const radius = position.planetRadiusM;
@@ -191,6 +255,10 @@ function SamplingPanel({ trail, position }: { trail: SamplingTrail; position: Su
   );
   const known = rows.filter((r) => r != null);
   const nearest = known.length > 0 ? Math.min(...known.map((r) => r.distance)) : null;
+  // A full bar must never imply it's safe when an earlier sample's position is unknown.
+  const progress = need != null && need > 0 && nearest != null && known.length === rows.length
+    ? Math.min(1, nearest / need)
+    : null;
 
   let status: { text: string; tone: string } | null = null;
   if (need != null && nearest != null) {
@@ -198,15 +266,16 @@ function SamplingPanel({ trail, position }: { trail: SamplingTrail; position: Su
     else if (known.length === rows.length) status = { text: `Clear · take sample ${trail.samples.length + 1}`, tone: "good" };
     else status = { text: "Clear of the samples with a known position", tone: "mixed" };
   }
+  const panel = useStateFlash<HTMLDivElement>(status?.tone === "good");
 
   return (
-    <div className="sp">
+    <div ref={panel} className="sp" data-tone={status?.tone}>
       <div className="sp__head">
         <span className="hl__tag hl__tag--bio">SAMPLE</span>
-        <span className="hl__body">{trail.species}</span>
-        <span>{trail.samples.length}/3</span>
-        {need != null && <span className="gl__muted">{need} m apart</span>}
+        <span className="sp__species">{trail.species}</span>
+        <SampleProgress samples={trail.samples.length} />
       </div>
+      {need != null && <div className="sp__spacing">{need} m minimum separation</div>}
       <div className="sp__samples">
         {rows.map((r, i) => (
           <span key={i} className={need != null && r && r.distance >= need ? "sp__sample sp__sample--clear" : "sp__sample"}>
@@ -221,6 +290,19 @@ function SamplingPanel({ trail, position }: { trail: SamplingTrail; position: Su
           </span>
         ))}
       </div>
+      {progress != null && (
+        <div
+          className="sp__distance"
+          role="progressbar"
+          aria-label="Distance to clear all previous samples"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress * 100)}
+          aria-valuetext={status?.text}
+        >
+          <span style={{ transform: `scaleX(${progress})` }} />
+        </div>
+      )}
       {status && <div className={`sp__status sp__status--${status.tone}`}>{status.text}</div>}
     </div>
   );
